@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Encryption">
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$" />
+      <root url="jar://$USER_HOME$/Desktop/java-json.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://$PROJECT_DIR$/src" />
+      <root url="jar://$USER_HOME$/Desktop/java-json.jar!/" />
+    </SOURCES>
+  </library>
+</component>
