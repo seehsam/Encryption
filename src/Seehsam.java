@@ -150,8 +150,11 @@ public class Seehsam {
 
     }
 
-
-
+    /**
+     * SecretKeySpecs erzeugt einen Key aus einem String
+     * @param myKey String aus dem ein Key erzeugt werden soll
+     * @return secretKey
+     */
     public static SecretKeySpec setKey(String myKey) {
         MessageDigest sha = null;
         byte[] key;
@@ -174,7 +177,13 @@ public class Seehsam {
 
     }
 
-    public static String encryptPrivateKey(String strToEncrypt, String secret) {
+    /**
+     * Verschlüsselt einen String mittels AES
+     * @param strToEncrypt  String der verschlüsselt werden soll
+     * @param secret    passphrase zum verschlüsseln
+     * @return String Cipher
+     */
+    public static String encryptString(String strToEncrypt, String secret) {
         try
         {
             Cipher cipher = Cipher.getInstance("AES");
@@ -188,7 +197,13 @@ public class Seehsam {
         return null;
     }
 
-    public static String decryptPrivateKey(String strToDecrypt, String secret) {
+    /**
+     * Entschlüsselt einen String mittels AES
+     * @param strToDecrypt  String der entschlüsselt werden soll
+     * @param secret    passphrase zum entschlüsseln
+     * @return
+     */
+    public static String decryptString(String strToDecrypt, String secret) {
         try
         {
             Cipher cipher = Cipher.getInstance("AES");
@@ -207,6 +222,8 @@ public class Seehsam {
     public static void main(String[] args) throws Exception {
         //Init 2 User -> Peter & Fred
         JSONArray hasAccess = new JSONArray();
+        JSONArray data = new JSONArray();
+
         JSONObject peter = new JSONObject();
         JSONObject petKeyPair = generateKeyPair();
         peter.put("encryption" , petKeyPair);
@@ -217,9 +234,18 @@ public class Seehsam {
         fred.put("encryption" , freKeyPair);
         fred.put("name" , "Federico");
 
+        JSONObject secretStuff = new JSONObject();
+        secretStuff.put("cash","10000€");
+        secretStuff.put("time", 2);
+
+        JSONObject secondSecretStuff = new JSONObject();
+        secondSecretStuff.put("log","This is a long string with informations");
+        secondSecretStuff.put("protocol","This is the protocol, im very happy");
+
+        data.put(secretStuff);
+        data.put(secondSecretStuff);
 
         //Bearbeiten der Berechtigungen
-
         hasAccess.put(peter);
         hasAccess.put(fred);
 
@@ -229,19 +255,14 @@ public class Seehsam {
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
         PublicKey pubKey = keyFactory.generatePublic(pubKeySpec);
 
-
-
-
-
-
         //Bibliothek Seehsam
         Seehsam sam = new Seehsam();
 
         //Encrypt Private-Key
         System.out.println("PrivateKey: " + peter.getJSONObject("encryption").get("private").toString());
-        String encPriv = sam.encryptPrivateKey(peter.getJSONObject("encryption").get("private").toString(),"password");
+        String encPriv = sam.encryptString(peter.getJSONObject("encryption").get("private").toString(),"password");
         System.out.println("EncPrivate: " + encPriv);
-        System.out.println("DecPrivate: " + sam.decryptPrivateKey(encPriv,"password"));
+        System.out.println("DecPrivate: " + sam.decryptString(encPriv,"password"));
 
 
         //DocumentKey verschlüsseln
@@ -271,6 +292,19 @@ public class Seehsam {
         System.out.println();
         System.out.println("Entschlüsselter DocKeyPeter: ");
         System.out.println(sam.decryptDocumentKey(encDocKey,peter));
+
+
+        //Daten verschlüsseln Fred
+        String dataCipherFred = sam.encryptString(data.toString(),decDocKeyFred);
+        System.out.println();
+        System.out.println("Verschlüsslte Daten Fred: ");
+        System.out.println(dataCipherFred);
+
+        //Daten entschlüsseln Fred
+        String plainDataFred = sam.decryptString(dataCipherFred,decDocKeyFred);
+        System.out.println();
+        System.out.println("Entschlüsselte Daten Fred: ");
+        System.out.println(plainDataFred);
 
     }
 }
