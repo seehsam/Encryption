@@ -15,40 +15,38 @@ import java.util.Arrays;
 import java.util.Base64;
 
 public class Seehsam {
+
     /**
      * Generiert ein RSA Schlüsselpaar mit einem Public und Private-Key
-     * @return RSA KeyPair
+     * Schlüssellänge: 512
+     * @return JSONObject with public and private key
      */
-    public static JSONObject generateKeyPair() throws Exception{
-        KeyPair keyPair = null;
-        KeyPairGenerator keygenerator = null;
+    private static JSONObject generateKeyPair() throws Exception{
+        KeyPair keyPair;
+        KeyPairGenerator keygenerator;
         JSONObject JSONkeyPairObject = new JSONObject();
         try {
             keygenerator = KeyPairGenerator.getInstance("RSA");
             keygenerator.initialize(512);
             keyPair = keygenerator.genKeyPair();
             byte[] encodedPrivateKey = keyPair.getPrivate().getEncoded();
-
-
             String b64private = Base64.getEncoder().encodeToString(encodedPrivateKey);
             JSONkeyPairObject.put("private",b64private);
-
             byte[] encodedPublicKey = keyPair.getPublic().getEncoded();
             String b64public = Base64.getEncoder().encodeToString(encodedPublicKey);
             JSONkeyPairObject.put("public",b64public);
         } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
         }
-
         return JSONkeyPairObject;
     }
 
     /**
      * Generiert einen zufälligen Documentkey
-     * @return randomBase64String   Zufälliger Base64 String
-     * @throws NoSuchAlgorithmException
+     * Schlüssellänge 256 Bit
+     * @return  Zufälliger Base64 String
      */
-    public static String generateRandomDocumentKey() throws NoSuchAlgorithmException {
+    private static String generateRandomDocumentKey() throws NoSuchAlgorithmException {
         KeyGenerator keyGenerator = KeyGenerator.getInstance("AES");
         SecureRandom secureRandom = new SecureRandom();
         int keyBitSize = 256;
@@ -56,9 +54,7 @@ public class Seehsam {
         Key secretKey = keyGenerator.generateKey();
         byte[] b = secretKey.getEncoded();
         BASE64Encoder myEncoder = new BASE64Encoder();
-        String randomBase64String = myEncoder.encode(b);
-
-        return randomBase64String;
+        return myEncoder.encode(b);
     }
 
 
@@ -68,41 +64,30 @@ public class Seehsam {
      * @param documentKey Schlüssel der den Vertrag verschlüsselt
      * @param hasAcc      JSONArray mit allen berechtigten Nutzern
      * @return BASE64 String
-     * @throws Exception
      */
-    public String encryptDocumentKey(String documentKey, JSONArray hasAcc) throws Exception {
+    private String encryptDocumentKey(String documentKey, JSONArray hasAcc) throws Exception {
         String geheim;
         JSONArray docKeys = new JSONArray();
         BASE64Encoder myEncoder = new BASE64Encoder();
-        BASE64Decoder myDecoder = new BASE64Decoder();
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-
-
         for (int i = 0; i < hasAcc.length(); i++) {
             // Verschluesseln
             Cipher cipher = Cipher.getInstance("RSA");
-
             //Convert Base64 Public-Key String to PublicKey
             String base64public = hasAcc.getJSONObject(i).getJSONObject("encryption").get("public").toString();
             byte[] publicBytes = Base64.getDecoder().decode(base64public);
             X509EncodedKeySpec pubKeySpec = new X509EncodedKeySpec(publicBytes);
             PublicKey pubKey = keyFactory.generatePublic(pubKeySpec);
-
             //Encrypt
             cipher.init(Cipher.ENCRYPT_MODE, pubKey);
             byte[] encrypted = cipher.doFinal(documentKey.getBytes());
-
             // bytes zu Base64-String konvertieren
             geheim = myEncoder.encode(encrypted);
-
             JSONObject docKey = new JSONObject();
             docKey.put(hasAcc.getJSONObject(i).get("name").toString(), geheim);
             docKeys.put(docKey);
         }
-        String docKeysString;
-        docKeysString = myEncoder.encode(docKeys.toString().getBytes());
-
-        return docKeysString;
+        return myEncoder.encode(docKeys.toString().getBytes());
     }
 
     /**
@@ -111,43 +96,33 @@ public class Seehsam {
      * @param documentKeyEnc BASE64 kodierter Text
      * @param user JSONObject eines Users
      * @return DocumentKey im Klartext
-     * @throws Exception
      */
-    public String decryptDocumentKey(String documentKeyEnc, JSONObject user) throws Exception {
+    private String decryptDocumentKey(String documentKeyEnc, JSONObject user) throws Exception {
         String username = user.get("name").toString();
-        String encDocKeyUser = null;
-        byte[] plainDocKey = null;
-        byte[] cipherData = null;
+        String encDocKeyUser;
+        byte[] plainDocKey;
+        byte[] cipherData;
         String finalCiper = null;
-
         BASE64Decoder myDecoder = new BASE64Decoder();
         byte[] plainDoc = myDecoder.decodeBuffer(documentKeyEnc);
         JSONArray jsa = new JSONArray(new String(plainDoc));
-
         for (int i = 0; i < jsa.length(); i++) { //Sort for name!
             if(jsa.getJSONObject(i).has(username)) {
                 encDocKeyUser  = jsa.getJSONObject(i).get(username).toString();
                 plainDocKey = myDecoder.decodeBuffer(encDocKeyUser);
                 Cipher cipher = Cipher.getInstance("RSA");
-
                 //Convert Base64 Public-Key String to PublicKey
                 String base64private = user.getJSONObject("encryption").get("private").toString();
                 byte[] privateBytes = Base64.getDecoder().decode(base64private);
-
                 PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(privateBytes);
                 KeyFactory kf = KeyFactory.getInstance("RSA");
                 RSAPrivateKey privKey = (RSAPrivateKey) kf.generatePrivate(spec);
-
-
                 cipher.init(Cipher.DECRYPT_MODE, privKey);
                 cipherData = cipher.doFinal(plainDocKey);
                 finalCiper = new String(cipherData);
-            } else {
             }
         }
-
         return finalCiper;
-
     }
 
     /**
@@ -155,8 +130,8 @@ public class Seehsam {
      * @param myKey String aus dem ein Key erzeugt werden soll
      * @return secretKey
      */
-    public static SecretKeySpec setKey(String myKey) {
-        MessageDigest sha = null;
+    private static SecretKeySpec setKey(String myKey) {
+        MessageDigest sha;
         byte[] key;
         SecretKeySpec secretKey;
         try {
@@ -167,14 +142,10 @@ public class Seehsam {
             secretKey = new SecretKeySpec(key, "AES");
             return secretKey;
         }
-        catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
-        catch (UnsupportedEncodingException e) {
+        catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
             e.printStackTrace();
         }
         return null;
-
     }
 
     /**
@@ -183,7 +154,7 @@ public class Seehsam {
      * @param secret    passphrase zum verschlüsseln
      * @return String Cipher
      */
-    public static String encryptString(String strToEncrypt, String secret) {
+    private String encryptString(String strToEncrypt, String secret) {
         try
         {
             Cipher cipher = Cipher.getInstance("AES");
@@ -203,7 +174,7 @@ public class Seehsam {
      * @param secret    passphrase zum entschlüsseln
      * @return
      */
-    public static String decryptString(String strToDecrypt, String secret) {
+    private String decryptString(String strToDecrypt, String secret) {
         try
         {
             Cipher cipher = Cipher.getInstance("AES");
@@ -221,90 +192,102 @@ public class Seehsam {
 
     public static void main(String[] args) throws Exception {
         //Init 2 User -> Peter & Fred
-        JSONArray hasAccess = new JSONArray();
-        JSONArray data = new JSONArray();
-
         JSONObject peter = new JSONObject();
+        JSONObject fred = new JSONObject();
         JSONObject petKeyPair = generateKeyPair();
         peter.put("encryption" , petKeyPair);
         peter.put("name" , "Peter");
-
-        JSONObject fred = new JSONObject();
         JSONObject freKeyPair = generateKeyPair();
         fred.put("encryption" , freKeyPair);
-        fred.put("name" , "Federico");
+        fred.put("name" , "Fred");
 
+        //Init data
+        JSONArray data = new JSONArray();
         JSONObject secretStuff = new JSONObject();
-        secretStuff.put("cash","10000€");
+        secretStuff.put("cash","10000 Euro");
         secretStuff.put("time", 2);
-
         JSONObject secondSecretStuff = new JSONObject();
         secondSecretStuff.put("log","This is a long string with informations");
         secondSecretStuff.put("protocol","This is the protocol, im very happy");
-
         data.put(secretStuff);
         data.put(secondSecretStuff);
 
-        //Bearbeiten der Berechtigungen
+        //Init has access
+        JSONArray hasAccess = new JSONArray();
         hasAccess.put(peter);
         hasAccess.put(fred);
 
-        String base64public = hasAccess.getJSONObject(0).getJSONObject("encryption").get("public").toString();
-        byte[] publicBytes = Base64.getDecoder().decode(base64public);
-        X509EncodedKeySpec pubKeySpec = new X509EncodedKeySpec(publicBytes);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        PublicKey pubKey = keyFactory.generatePublic(pubKeySpec);
-
-        //Bibliothek Seehsam
+        //Init Seehsam
         Seehsam sam = new Seehsam();
 
         //Encrypt Private-Key
-        System.out.println("PrivateKey: " + peter.getJSONObject("encryption").get("private").toString());
-        String encPriv = sam.encryptString(peter.getJSONObject("encryption").get("private").toString(),"password");
-        System.out.println("EncPrivate: " + encPriv);
-        System.out.println("DecPrivate: " + sam.decryptString(encPriv,"password"));
-
-
-        //DocumentKey verschlüsseln
-        String randomDoc = generateRandomDocumentKey();
-        String encDocKey =  sam.encryptDocumentKey(randomDoc,hasAccess);
-
+        System.out.println("PrivateKey Peter in Base64: ");
+        System.out.println(peter.getJSONObject("encryption").get("private").toString());
         System.out.println();
+
+        //Encrypted Private-Key
+        String encPriv = sam.encryptString(peter.getJSONObject("encryption").get("private").toString(),"password");
+        System.out.println("Encrypted PrivateKey Peter in Base64: ");
+        System.out.println(encPriv);
+        System.out.println();
+
+        //Decrypted Private-Key
+        System.out.println("Decrypted PrivateKey Peter in Base64: ");
+        System.out.println(sam.decryptString(encPriv,"password"));
+
+        //generate documentKey
+        String randomDoc = generateRandomDocumentKey();
+
+        //Plain documentKey
         System.out.println("Documentkey Klartext: ");
         System.out.println(randomDoc);
         System.out.println();
-        System.out.println("Verschlüsselter Documentkey: ");
+
+        //Encrypted Documentkey hasAccess
+        String encDocKey =  sam.encryptDocumentKey(randomDoc,hasAccess);
+        System.out.println("Encrypted Documentkey in Base64: ");
         System.out.println(encDocKey);
         System.out.println();
 
-
-        //DocumentKey entschlüsseln Fred
+        //Decrypted DocumentKey Fred
         String decDocKeyFred = sam.decryptDocumentKey(encDocKey,fred);
-
         System.out.println();
-        System.out.println("Entschlüsselter DocKeyFred: ");
+        System.out.println("Decrypted DocumentKey Fred: ");
         System.out.println(decDocKeyFred);
-
 
         //DocumentKey entschlüsseln Peter
         String decDocKeyPeter = sam.decryptDocumentKey(encDocKey,peter);
-
         System.out.println();
-        System.out.println("Entschlüsselter DocKeyPeter: ");
+        System.out.println("Decrypted DocKeyPeter: ");
         System.out.println(sam.decryptDocumentKey(encDocKey,peter));
 
+        //Plain Data
+        System.out.println();
+        System.out.println("Plain data: ");
+        System.out.println(data);
 
-        //Daten verschlüsseln Fred
+        //Encrypted data with documentKey Fred
         String dataCipherFred = sam.encryptString(data.toString(),decDocKeyFred);
         System.out.println();
-        System.out.println("Verschlüsslte Daten Fred: ");
+        System.out.println("Encrypted data with documentKey Fred: ");
         System.out.println(dataCipherFred);
 
-        //Daten entschlüsseln Fred
+        //Encrypted data with documentKey Peter
+        String dataCipherPeter = sam.encryptString(data.toString(),decDocKeyPeter);
+        System.out.println();
+        System.out.println("Encrypted data with documentKey Peter: ");
+        System.out.println(dataCipherPeter);
+
+        //Decrypted data Fred
         String plainDataFred = sam.decryptString(dataCipherFred,decDocKeyFred);
         System.out.println();
-        System.out.println("Entschlüsselte Daten Fred: ");
+        System.out.println("Decrypted data Fred: ");
         System.out.println(plainDataFred);
 
+        //Decrypted data Peter
+        String plainDataPeter = sam.decryptString(dataCipherPeter,decDocKeyPeter);
+        System.out.println();
+        System.out.println("Decrypted data Peter: ");
+        System.out.println(plainDataPeter);
     }
 }
