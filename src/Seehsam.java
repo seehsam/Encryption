@@ -2,22 +2,22 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import sun.misc.BASE64Decoder;
 import sun.misc.BASE64Encoder;
-
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.io.UnsupportedEncodingException;
 import java.security.*;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Arrays;
 import java.util.Base64;
 
 public class Seehsam {
 
-    static int RSA_KEY_SIZE = 512;
-    static int AES_KEY_SIZE = 256;
+    private static  int RSA_KEY_SIZE = 4096;
+    private static int AES_KEY_SIZE = 256;
+    private static int IV_KEY_SIZE = 16;
+    private static int HASH_KEY_SIZE = 16;
 
     /**
      * Generiert ein RSA Schlüsselpaar mit einem Public und Private-Key
@@ -127,70 +127,71 @@ public class Seehsam {
         return finalCiper;
     }
 
-    /**
-     * SecretKeySpecs erzeugt einen AES Key aus einem String
-     * @param myKey String aus dem ein Key erzeugt werden soll
-     * @return secretKey
-     */
-    private static SecretKeySpec setKey(String myKey) {
-        MessageDigest sha;
-        byte[] key;
-        SecretKeySpec secretKey;
-        try {
-            key = myKey.getBytes("UTF-8");
-            sha = MessageDigest.getInstance("SHA-1");
-            key = sha.digest(key);
-            key = Arrays.copyOf(key, 16);
-            secretKey = new SecretKeySpec(key, "AES");
-            return secretKey;
-        }
-        catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
-            e.printStackTrace();
-        }
-        return null;
+
+    private static String encryptString(String plainText, String key) throws Exception {
+        byte[] clean = plainText.getBytes();
+
+        // Generating IV.
+        byte[] iv = new byte[IV_KEY_SIZE];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(iv);
+        IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
+
+        // Hashing key.
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.update(key.getBytes("UTF-8"));
+        byte[] keyBytes = new byte[HASH_KEY_SIZE];
+        System.arraycopy(digest.digest(), 0, keyBytes, 0, keyBytes.length);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
+
+        // Encrypt.
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivParameterSpec);
+        byte[] encrypted = cipher.doFinal(clean);
+
+        // Combine IV and encrypted part.
+        byte[] encryptedIVAndText = new byte[IV_KEY_SIZE + encrypted.length];
+        System.arraycopy(iv, 0, encryptedIVAndText, 0, IV_KEY_SIZE);
+        System.arraycopy(encrypted, 0, encryptedIVAndText, IV_KEY_SIZE, encrypted.length);
+
+        return Base64.getEncoder().encodeToString(encryptedIVAndText);
     }
 
-    /**
-     * Verschlüsselt einen String mittels AES
-     * @param strToEncrypt  String der verschlüsselt werden soll
-     * @param secret    passphrase zum verschlüsseln
-     * @return String Cipher
-     */
-    private static String encryptString(String strToEncrypt, String secret) {
-        try
-        {
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.ENCRYPT_MODE, setKey(secret));
-            return Base64.getEncoder().encodeToString(cipher.doFinal(strToEncrypt.getBytes("UTF-8")));
-        }
-        catch (Exception e)
-        {
-            System.out.println("Error while encrypting: " + e.toString());
-        }
-        return null;
+    private static String decryptString(String cipherText, String key) throws Exception {
+        byte[] encryptedIvTextBytes = Base64.getDecoder().decode(cipherText);
+
+        // Extract IV.
+        byte[] iv = new byte[IV_KEY_SIZE];
+        System.arraycopy(encryptedIvTextBytes, 0, iv, 0, iv.length);
+        IvParameterSpec ivParameterSpec = new IvParameterSpec(iv);
+
+        // Extract encrypted part.
+        int encryptedSize = encryptedIvTextBytes.length - IV_KEY_SIZE;
+        byte[] encryptedBytes = new byte[encryptedSize];
+        System.arraycopy(encryptedIvTextBytes, IV_KEY_SIZE, encryptedBytes, 0, encryptedSize);
+
+        // Hash key.
+        byte[] keyBytes = new byte[HASH_KEY_SIZE];
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        md.update(key.getBytes());
+        System.arraycopy(md.digest(), 0, keyBytes, 0, keyBytes.length);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(keyBytes, "AES");
+
+        // Decrypt.
+        Cipher cipherDecrypt = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipherDecrypt.init(Cipher.DECRYPT_MODE, secretKeySpec, ivParameterSpec);
+        byte[] decrypted = cipherDecrypt.doFinal(encryptedBytes);
+
+        return new String(decrypted);
     }
 
-    /**
-     * Entschlüsselt einen String mittels AES
-     * @param strToDecrypt  String der entschlüsselt werden soll
-     * @param secret    passphrase zum entschlüsseln
-     * @return
-     */
-    private static String decryptString(String strToDecrypt, String secret) {
-        try
-        {
-            Cipher cipher = Cipher.getInstance("AES");
-            cipher.init(Cipher.DECRYPT_MODE, setKey(secret));
-            return new String(cipher.doFinal(Base64.getDecoder().decode(strToDecrypt)));
-        }
-        catch (Exception e)
-        {
-            System.out.println("Error while decrypting: " + e.toString());
-        }
-        return null;
-    }
+
+
 
     public static void main(String[] args) throws Exception {
+        //Init Seehsam
+        Seehsam sam = new Seehsam();
+
         //Init 2 User -> Peter & Fred
         JSONObject peter = new JSONObject();
         JSONObject fred = new JSONObject();
@@ -217,8 +218,7 @@ public class Seehsam {
         hasAccess.put(peter);
         hasAccess.put(fred);
 
-        //Init Seehsam
-        Seehsam sam = new Seehsam();
+
 
         //Encrypt Private-Key
         System.out.println("EncPrivateKey Peter in Base64: ");
